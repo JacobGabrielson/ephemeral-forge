@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ephemeral-forge"
+version = "0.1.0"
+description = "Spin up massive spot/preemptible compute fleets in seconds"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = [
+    "typer[all]>=0.9",
+    "boto3>=1.28",
+    "cryptography>=41.0",
+    "paramiko>=3.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4",
+    "pytest>=7.0",
+    "mypy>=1.5",
+    "boto3-stubs[ec2]",
+]
+gcp = [
+    "google-cloud-compute>=1.14",
+]
+azure = [
+    "azure-mgmt-compute>=30.0",
+    "azure-mgmt-network>=25.0",
+    "azure-mgmt-resource>=23.0",
+    "azure-identity>=1.14",
+]
+
+[project.scripts]
+ef = "ephemeral_forge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ephemeral_forge*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
