@@ -91,9 +91,8 @@ hostname costs ~22ms.  For accurate benchmarks:
 
 ## Karpenter Patterns Worth Borrowing
 
-Several patterns from Karpenter's codebase
-(`~/src/karpenter-provider-aws`) that could improve the
-fleet launcher:
+Several patterns from the Karpenter AWS provider codebase
+that could improve the fleet launcher:
 
 1. **Unavailable offerings cache**: Track which (type, AZ)
    combos returned `InsufficientInstanceCapacity` and skip
