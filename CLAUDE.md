@@ -13,7 +13,14 @@ for design reference only — they must be rewritten in Python.
 Use `click` or `typer` for CLI. Use `boto3` for AWS. Use
 `asyncio` where concurrency helps (e.g., parallel SSH).
 
-## EC2 / AWS
+## Multi-Cloud
+
+AWS is the first implementation. The design should
+accommodate GCP, Azure, OCI, and others. Keep
+cloud-specific code behind a provider abstraction so
+adding new clouds doesn't require rewriting the core.
+
+## EC2 / AWS (first provider)
 
 - **Always use CreateFleet**, never RunInstances. No fallbacks.
   No exceptions.
