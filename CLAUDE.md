@@ -124,6 +124,16 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Code Quality
+
+All Python code must:
+
+- **Pass `ruff format`** (formatter). Run before every commit.
+- **Pass `ruff check`** (linter). Fix all warnings before
+  committing. No `# noqa` suppressions without a comment
+  explaining why.
+- Use type hints on all function signatures.
+
 ## Markdown Standards
 
 Word wrap paragraphs/prose at 80 chars. Align table columns.
