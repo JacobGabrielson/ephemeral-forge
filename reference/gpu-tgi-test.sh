@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Spin up a cheap GPU spot instance via CreateFleet, run TGI,
 # test it, tear it down. Uses Karpenter-style fleet patterns
-# from iron-proxy perfspace.
+# from ephemeral-forge reference scripts.
 set -euo pipefail
 
-AWS="aws --profile spot-builder"
+AWS="aws --profile ${EF_AWS_PROFILE:-default}"
 REGION="us-east-2"
 TAG="tgi-test-$(date +%s)"
 

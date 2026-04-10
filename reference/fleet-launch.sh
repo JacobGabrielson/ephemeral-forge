@@ -16,12 +16,12 @@
 #   --tag TAG          Run tag (default: fleet-<timestamp>)
 #
 # Output:
-#   Writes fleet state to perfspace/fleet-state/<tag>/
+#   Writes fleet state to fleet-state/<tag>/
 #   including instance IDs, IPs, and SSH key.
 #
 set -euo pipefail
 
-AWS="aws --profile spot-builder"
+AWS="aws --profile ${EF_AWS_PROFILE:-default}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ── Defaults ─────────────────────────────────────────────────

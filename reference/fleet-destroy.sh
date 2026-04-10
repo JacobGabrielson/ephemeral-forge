@@ -6,7 +6,7 @@
 #
 set -euo pipefail
 
-AWS="aws --profile spot-builder"
+AWS="aws --profile ${EF_AWS_PROFILE:-default}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TAG="${1:?Usage: fleet-destroy.sh <tag>}"
 STATE_DIR="$SCRIPT_DIR/fleet-state/$TAG"

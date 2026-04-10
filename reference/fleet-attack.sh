@@ -27,7 +27,7 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLeve
 # Target files live alongside this script (copied from test/perf/targets/)
 TARGETS_DIR="$SCRIPT_DIR/../test/perf/targets"
 if [[ ! -f "$TARGETS_DIR/$SCENARIO.txt" ]]; then
-    # Also check local perfspace copy
+    # Also check local copy
     TARGETS_DIR="$SCRIPT_DIR/targets"
 fi
 if [[ ! -f "$TARGETS_DIR/$SCENARIO.txt" ]]; then

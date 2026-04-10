@@ -1,7 +1,7 @@
 # EC2 Fleet Strategies for Perf Testing
 
 Notes on EC2 spot fleet patterns learned from Karpenter's AWS
-provider and applied to the iron-proxy multi-agent fleet
+provider and applied to the ephemeral-forge fleet
 launcher.
 
 ## CreateFleet > RunInstances

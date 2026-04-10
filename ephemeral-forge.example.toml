@@ -1,0 +1,53 @@
+# ephemeral-forge configuration
+# This file is NOT checked into git — it contains account-specific
+# credentials and settings.
+
+[aws]
+profile = "default"    # your AWS CLI profile name
+# Regions to probe for cheapest spot prices. All regions are
+# probed by default; list specific ones here to limit scope.
+# candidate_regions = ["us-east-1", "us-east-2", "us-west-2"]
+max_spot_price = 0.40    # hard ceiling $/hr, never pay more
+default_instance_types = [
+    "t3.small", "t3a.small", "t3.micro", "t3a.micro",
+    "m6i.large", "m5.large", "c6i.large", "c5.large",
+]
+gpu_instance_types = [
+    "g4dn.xlarge", "g4dn.2xlarge",
+    "g5.xlarge", "g5.2xlarge",
+    "g6.xlarge",
+]
+ssh_user = "ubuntu"
+
+[gcp]
+project_id = ""
+# candidate_regions = ["us-central1", "us-east1", "us-west1", "europe-west1"]
+default_instance_types = [
+    "e2-standard-2", "e2-standard-4",
+    "n2-standard-2", "n2-standard-4",
+]
+gpu_instance_types = [
+    "g2-standard-4", "g2-standard-8",
+    "n1-standard-4",   # attach T4 via accelerators config
+    "a2-highgpu-1g",
+]
+ssh_user = "ubuntu"
+
+[azure]
+subscription_id = ""
+# candidate_regions = ["eastus", "eastus2", "westus2", "westeurope"]
+default_instance_types = [
+    "Standard_D2s_v5", "Standard_D4s_v5",
+    "Standard_B2ms",
+]
+gpu_instance_types = [
+    "Standard_NC4as_T4_v3", "Standard_NC8as_T4_v3",
+    "Standard_NV36ads_A10_v5",
+]
+ssh_user = "azureuser"
+
+[general]
+# Tag applied to all resources for cleanup
+purpose_tag = "ephemeral-forge"
+# Probe ALL regions worldwide by default (not just a subset)
+probe_all_regions = true
