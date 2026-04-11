@@ -21,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 PERSISTENT_SG_NAME = "ephemeral-forge-sg"
 
+DEFAULT_INSTANCE_TYPES = [
+    "t3.small",
+    "t3a.small",
+    "t3.micro",
+    "t3a.micro",
+    "m6i.large",
+    "m5.large",
+    "c6i.large",
+    "c5.large",
+]
+
 
 class AWSProvider(ProviderBase):
     def __init__(self, config: AWSConfig) -> None:
@@ -153,8 +164,8 @@ class AWSProvider(ProviderBase):
             logger.info("Reusing security group %s", sg["GroupId"])
             return sg["GroupId"], sg["VpcId"]
 
-        # Need to create — get default VPC first
-        vpc_id, vpc_cidr = self._get_default_vpc(ec2)
+        # Need to create — ensure we have a VPC first
+        vpc_id, vpc_cidr = self._ensure_vpc(ec2, region)
 
         sg_resp = ec2.create_security_group(
             GroupName=PERSISTENT_SG_NAME,
@@ -211,14 +222,126 @@ class AWSProvider(ProviderBase):
         logger.info("Created security group %s in %s", sg_id, region)
         return sg_id, vpc_id
 
-    @staticmethod
-    def _get_default_vpc(ec2: object) -> tuple[str, str]:
-        """Return (vpc_id, vpc_cidr) for the default VPC."""
+    def _ensure_vpc(self, ec2: object, region: str) -> tuple[str, str]:
+        """Find or create a VPC for ephemeral-forge.
+
+        First tries the default VPC (most accounts have one).
+        Falls back to an existing ephemeral-forge-tagged VPC.
+        Creates a new VPC + subnets + internet gateway as a
+        last resort.
+
+        Returns (vpc_id, vpc_cidr).
+        """
+        # 1. Try default VPC
         resp = ec2.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])
-        if not resp["Vpcs"]:
-            raise RuntimeError("No default VPC found")
-        vpc = resp["Vpcs"][0]
-        return vpc["VpcId"], vpc["CidrBlock"]
+        if resp["Vpcs"]:
+            vpc = resp["Vpcs"][0]
+            return vpc["VpcId"], vpc["CidrBlock"]
+
+        # 2. Try existing ephemeral-forge VPC
+        resp = ec2.describe_vpcs(
+            Filters=[
+                {"Name": "tag:Purpose", "Values": ["ephemeral-forge"]},
+            ]
+        )
+        if resp["Vpcs"]:
+            vpc = resp["Vpcs"][0]
+            logger.info("Reusing ephemeral-forge VPC %s", vpc["VpcId"])
+            return vpc["VpcId"], vpc["CidrBlock"]
+
+        # 3. Create a new VPC
+        logger.info("No default VPC in %s — creating one", region)
+        vpc_cidr = "10.0.0.0/16"
+        vpc_resp = ec2.create_vpc(
+            CidrBlock=vpc_cidr,
+            TagSpecifications=[
+                {
+                    "ResourceType": "vpc",
+                    "Tags": [
+                        {"Key": "Name", "Value": "ephemeral-forge"},
+                        {"Key": "Purpose", "Value": "ephemeral-forge"},
+                    ],
+                }
+            ],
+        )
+        vpc_id = vpc_resp["Vpc"]["VpcId"]
+
+        # Enable DNS hostnames (needed for public DNS names)
+        ec2.modify_vpc_attribute(
+            VpcId=vpc_id,
+            EnableDnsHostnames={"Value": True},
+        )
+
+        # Internet gateway — required for public IPs to work
+        igw_resp = ec2.create_internet_gateway(
+            TagSpecifications=[
+                {
+                    "ResourceType": "internet-gateway",
+                    "Tags": [
+                        {"Key": "Name", "Value": "ephemeral-forge"},
+                        {"Key": "Purpose", "Value": "ephemeral-forge"},
+                    ],
+                }
+            ],
+        )
+        igw_id = igw_resp["InternetGateway"]["InternetGatewayId"]
+        ec2.attach_internet_gateway(InternetGatewayId=igw_id, VpcId=vpc_id)
+
+        # Route table — add default route to IGW
+        rt_resp = ec2.describe_route_tables(
+            Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]
+        )
+        rt_id = rt_resp["RouteTables"][0]["RouteTableId"]
+        ec2.create_route(
+            RouteTableId=rt_id,
+            DestinationCidrBlock="0.0.0.0/0",
+            GatewayId=igw_id,
+        )
+
+        # Create one subnet per AZ
+        azs_resp = ec2.describe_availability_zones(
+            Filters=[{"Name": "state", "Values": ["available"]}]
+        )
+        for i, az in enumerate(azs_resp["AvailabilityZones"]):
+            subnet_cidr = f"10.0.{i}.0/24"
+            ec2.create_subnet(
+                VpcId=vpc_id,
+                CidrBlock=subnet_cidr,
+                AvailabilityZone=az["ZoneName"],
+                TagSpecifications=[
+                    {
+                        "ResourceType": "subnet",
+                        "Tags": [
+                            {
+                                "Key": "Name",
+                                "Value": f"ephemeral-forge-{az['ZoneName']}",
+                            },
+                            {"Key": "Purpose", "Value": "ephemeral-forge"},
+                        ],
+                    }
+                ],
+            )
+            # Auto-assign public IPs in each subnet
+            ec2.modify_subnet_attribute(
+                SubnetId=ec2.describe_subnets(
+                    Filters=[
+                        {"Name": "vpc-id", "Values": [vpc_id]},
+                        {
+                            "Name": "availability-zone",
+                            "Values": [az["ZoneName"]],
+                        },
+                    ]
+                )["Subnets"][0]["SubnetId"],
+                MapPublicIpOnLaunch={"Value": True},
+            )
+
+        logger.info(
+            "Created VPC %s with %d subnets in %s",
+            vpc_id,
+            len(azs_resp["AvailabilityZones"]),
+            region,
+        )
+        return vpc_id, vpc_cidr
 
     def _get_subnets(
         self,
@@ -226,7 +349,7 @@ class AWSProvider(ProviderBase):
         vpc_id: str,
         zone: str | None = None,
     ) -> list[str]:
-        """Get subnet IDs in the default VPC."""
+        """Get subnet IDs in the VPC."""
         filters = [{"Name": "vpc-id", "Values": [vpc_id]}]
         if zone:
             filters.append({"Name": "availability-zone", "Values": [zone]})
