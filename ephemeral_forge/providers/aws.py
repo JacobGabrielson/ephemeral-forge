@@ -41,6 +41,14 @@ class AWSProvider(ProviderBase):
     def _client(self, service: str, region: str) -> object:
         return self._session.client(service, region_name=region)
 
+    @property
+    def default_instance_types(self) -> list[str]:
+        return list(DEFAULT_INSTANCE_TYPES)
+
+    @property
+    def default_gpu_instance_types(self) -> list[str]:
+        return ["g4dn.xlarge", "g4dn.2xlarge", "g5.xlarge", "g6.xlarge"]
+
     # ── probe_spot_prices ────────────────────────────────────
 
     def probe_spot_prices(

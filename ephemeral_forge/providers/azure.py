@@ -15,6 +15,14 @@ class AzureProvider(ProviderBase):
     def __init__(self, config: AzureConfig) -> None:
         self.config = config
 
+    @property
+    def default_instance_types(self) -> list[str]:
+        return ["Standard_D2s_v5", "Standard_D4s_v5", "Standard_B2ms"]
+
+    @property
+    def default_gpu_instance_types(self) -> list[str]:
+        return ["Standard_NC4as_T4_v3", "Standard_NC8as_T4_v3"]
+
     def probe_spot_prices(
         self,
         instance_types: list[str],

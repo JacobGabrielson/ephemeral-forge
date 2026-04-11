@@ -61,7 +61,7 @@ def load_config(path: Path | None = None) -> Config:
                 data = tomllib.load(f)
             return _parse_config(data)
 
-    return Config(aws=AWSConfig(instance_types=list(_aws_default_types())))
+    return Config(aws=AWSConfig())
 
 
 def _parse_config(data: dict[str, object]) -> Config:
@@ -72,10 +72,7 @@ def _parse_config(data: dict[str, object]) -> Config:
         assert isinstance(raw, dict)
         config.aws = AWSConfig(
             profile=raw.get("profile", "default"),
-            instance_types=raw.get(
-                "default_instance_types",
-                list(_aws_default_types()),
-            ),
+            instance_types=raw.get("default_instance_types", []),
             gpu_instance_types=raw.get("gpu_instance_types", []),
             ssh_user=raw.get("ssh_user", "ubuntu"),
             candidate_regions=raw.get("candidate_regions"),
@@ -113,10 +110,3 @@ def _parse_config(data: dict[str, object]) -> Config:
         config.probe_all_regions = raw.get("probe_all_regions", True)
 
     return config
-
-
-def _aws_default_types() -> list[str]:
-    """Lazy import to avoid circular dependency."""
-    from ephemeral_forge.providers.aws import DEFAULT_INSTANCE_TYPES
-
-    return list(DEFAULT_INSTANCE_TYPES)

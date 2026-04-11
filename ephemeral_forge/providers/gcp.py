@@ -15,6 +15,14 @@ class GCPProvider(ProviderBase):
     def __init__(self, config: GCPConfig) -> None:
         self.config = config
 
+    @property
+    def default_instance_types(self) -> list[str]:
+        return ["e2-standard-2", "e2-standard-4", "n2-standard-2", "n2-standard-4"]
+
+    @property
+    def default_gpu_instance_types(self) -> list[str]:
+        return ["g2-standard-4", "g2-standard-8", "n1-standard-4", "a2-highgpu-1g"]
+
     def probe_spot_prices(
         self,
         instance_types: list[str],

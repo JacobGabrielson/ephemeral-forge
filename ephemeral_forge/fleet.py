@@ -46,7 +46,12 @@ def launch(
     if instance_types is None:
         instance_types = pconfig.gpu_instance_types if gpu else pconfig.instance_types
     if not instance_types:
-        raise ValueError(f"No instance types configured for {provider_name}")
+        # Fall back to provider's built-in defaults
+        instance_types = (
+            provider.default_gpu_instance_types
+            if gpu
+            else provider.default_instance_types
+        )
 
     # Timing record
     record = LaunchRecord(

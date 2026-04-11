@@ -57,6 +57,18 @@ class SpotPrice:
 class ProviderBase(abc.ABC):
     """Abstract base for all cloud providers."""
 
+    @property
+    @abc.abstractmethod
+    def default_instance_types(self) -> list[str]:
+        """Provider's built-in default instance types."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def default_gpu_instance_types(self) -> list[str]:
+        """Provider's built-in default GPU instance types."""
+        ...
+
     @abc.abstractmethod
     def probe_spot_prices(
         self,
