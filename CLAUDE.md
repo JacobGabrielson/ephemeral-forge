@@ -10,10 +10,11 @@ library code must be Python. The `reference/` directory
 contains the original bash scripts for design reference
 only — they must be rewritten in Python.
 
-Use `click` or `typer` for CLI. Use `boto3` for AWS,
+Use `typer` for CLI. Use `boto3` for AWS,
 `google-cloud-compute` for GCP, `azure-mgmt-compute` for
-Azure. Use `asyncio` where concurrency helps (e.g., parallel
-SSH).
+Azure. Use `paramiko` for SSH, `cryptography` for key
+generation. Use `asyncio` where concurrency helps (e.g.,
+parallel region probing, parallel SSH).
 
 **Prefer native libraries over shelling out.** Use `boto3`
 instead of calling `aws` CLI. Use `paramiko` or `asyncssh`
@@ -114,6 +115,25 @@ For Azure: query the Retail Prices API
 - SDK: `azure-mgmt-compute`, `azure-mgmt-network`,
   `azure-mgmt-resource`, `azure-identity`.
 
+## Reusable vs Per-Run Infrastructure
+
+Resources split into two tiers. Persistent infra costs
+nothing to keep around and speeds up future launches —
+reuse by tag, create on first launch if missing, destroy
+only via explicit `ef infra teardown`.
+
+| Tier           | AWS                              | GCP                           | Azure                      |
+|----------------|----------------------------------|-------------------------------|----------------------------|
+| **Persistent** | VPC, subnets, security group     | Network, firewall rules       | (none — RG is per-run)     |
+| **Per-run**    | Key pair, launch template, instances | Instances (SSH via metadata) | Entire resource group      |
+
+VPC fallback chain (AWS): default VPC → existing
+`Purpose=ephemeral-forge` tagged VPC → create new (with IGW
++ subnets per AZ + public-IP-on-launch).
+
+Network fallback chain (GCP): `default` network →
+`ephemeral-forge` network → create new auto-mode network.
+
 ## Design Principles
 
 - **Preemptible only, always.** Spot (AWS), Spot VMs (GCP),
@@ -206,6 +226,72 @@ All Python code must:
 
 Word wrap paragraphs/prose at 80 chars. Align table columns.
 Do not wrap text inside triple backtick blocks.
+
+## Gotchas
+
+Things that cost us time on initial implementation — the
+cloud SDKs have rough edges that aren't obvious from their
+docs.
+
+### AWS
+
+- **Use `CreateKeyPair` (with `KeyType="ed25519"`), not
+  `ImportKeyPair`.** Many IAM policies grant the former but
+  not the latter. Capture the returned `KeyMaterial` as the
+  private key — no need to generate locally.
+
+### GCP
+
+- **Ubuntu 24.04 image requires ≥10 GB boot disk.** The
+  provider must enforce a floor on `disk_gb` (`max(n, 10)`)
+  or `bulkInsert` rejects with a cryptic validation error.
+- **`bulk_insert` kwarg is `bulk_insert_instance_resource_resource`**
+  (double `_resource` suffix — SDK auto-generation artifact).
+- **`disk_type` in bulkInsert wants bare name** like
+  `"pd-balanced"`, not the zonal URL path
+  (`zones/xxx/diskTypes/pd-balanced`). Other APIs accept the
+  URL form, but bulkInsert doesn't.
+- **`InstancesClient.list()` rejects `filter=` as a kwarg** —
+  build a `ListInstancesRequest` object and pass via
+  `request=`.
+- **Spot prices are fixed per (type, zone)**, not auction-based.
+  Probe availability via `MachineTypesClient.get()`; use
+  approximate known prices for ranking.
+- **ADC is required, not just user auth.** `gcloud auth login`
+  is NOT enough for the Python SDK — you need
+  `gcloud auth application-default login --project <project>`.
+
+## Design Decisions
+
+- **Providers own their default instance types** via
+  `default_instance_types` / `default_gpu_instance_types`
+  properties on `ProviderBase`. The config layer is a pure
+  TOML parser and knows nothing about provider-specific
+  values. Fallback chain: CLI flag > TOML > provider default.
+- **State layout:**
+  - Per-run: `~/.ephemeral-forge/runs/<run_id>/` containing
+    `state.json` (serialized `FleetResult`) and
+    `private_key.pem` (mode 0600).
+  - Launch history: `~/.ephemeral-forge/history.json`
+    (append-only log of `LaunchRecord` entries; fuels
+    time-adjusted provider scoring).
+- **Time-adjusted cost scoring:** during region selection,
+  penalize slow provider/regions by computing
+  `effective_cost = spot_price * (1 + median_boot_s / 3600)`.
+  Prefer faster within a 20% cost margin, but a significantly
+  cheaper option still wins.
+
+## Dev Tooling
+
+- **LSP/type checker: `basedpyright`.** Install into the
+  venv. The repo is tuned for this; don't substitute pyright
+  or pylsp.
+- **`source .venv/bin/activate` before anything.** Never
+  install into system Python.
+- **Test scripts live in `tests/`.** `tests/load_test_demo.py`
+  is the end-to-end smoke test (launch SUT + load gen fleet,
+  run wrk, teardown). Useful as a reference for
+  library-as-API usage.
 
 ## Key Patterns
 
